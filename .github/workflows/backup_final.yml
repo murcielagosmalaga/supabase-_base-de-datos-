@@ -20,7 +20,7 @@ jobs:
           docker run --rm \
             -e DATABASE_URL="$DATABASE_URL" \
             postgres:17 \
-            bash -c 'PGSSLMODE=require pg_dump "$DATABASE_URL"' > backup.sql
+            bash -c 'PGSSLMODE=require pg_dump --no-owner --no-privileges "$DATABASE_URL"' > backup.sql
 
       - name: Install jq, 7zip and PostgreSQL client
         run: |
