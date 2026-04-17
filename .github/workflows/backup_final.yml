@@ -20,7 +20,7 @@ jobs:
           docker run --rm \
             -e DATABASE_URL="$DATABASE_URL" \
             postgres:17 \
-            bash -c 'PGSSLMODE=require pg_dump --no-owner --no-privileges "$DATABASE_URL"' > backup.sql
+            bash -c 'PGSSLMODE=require pg_dump --schema=public --no-owner --no-privileges "$DATABASE_URL"' > backup.sql
 
       - name: Install jq, 7zip and PostgreSQL client
         run: |
@@ -85,11 +85,11 @@ jobs:
           name: backup-zip
           path: backup.zip
 
-      - name: Clean Neon database
+      - name: Clean Neon public schema
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
         run: |
-          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 
       - name: Restore backup to Neon
         env:
