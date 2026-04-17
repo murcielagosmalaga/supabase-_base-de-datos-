@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Run backup
+      - name: Run backup from Supabase
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -22,10 +22,16 @@ jobs:
             postgres:17 \
             bash -c 'PGSSLMODE=require pg_dump "$DATABASE_URL"' > backup.sql
 
-      - name: Install jq
+      - name: Install jq, 7zip and PostgreSQL client
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq p7zip-full postgresql-client
+
+      - name: Compress backup with password
+        env:
+          ZIP_PASSWORD: ${{ secrets.ZIP_PASSWORD }}
+        run: |
+          7z a backup.zip backup.sql -p"$ZIP_PASSWORD" -mem=AES256
 
       - name: Get Google Access Token
         id: google_token
@@ -50,17 +56,17 @@ jobs:
 
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Upload backup to Google Drive
+      - name: Upload backup ZIP to Google Drive
         env:
           ACCESS_TOKEN: ${{ steps.google_token.outputs.access_token }}
           GOOGLE_FOLDER_ID: ${{ secrets.GOOGLE_FOLDER_ID }}
         run: |
-          FILE_NAME="backup-$(date +%F-%H-%M).sql"
+          FILE_NAME="backup-$(date +%F-%H-%M).zip"
 
           RESPONSE=$(curl -s -X POST "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,parents" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -F "metadata={\"name\":\"${FILE_NAME}\",\"parents\":[\"${GOOGLE_FOLDER_ID}\"]};type=application/json;charset=UTF-8" \
-            -F "file=@backup.sql;type=application/sql")
+            -F "file=@backup.zip;type=application/zip")
 
           echo "$RESPONSE"
 
@@ -73,8 +79,20 @@ jobs:
 
           echo "Archivo subido correctamente: $FILE_NAME ($FILE_ID)"
 
-      - name: Upload artifact to GitHub
+      - name: Upload ZIP artifact to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: backup
-          path: backup.sql
+          name: backup-zip
+          path: backup.zip
+
+      - name: Clean Neon database
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+      - name: Restore backup to Neon
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 < backup.sql
