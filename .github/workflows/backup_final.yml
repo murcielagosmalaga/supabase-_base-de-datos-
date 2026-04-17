@@ -95,19 +95,8 @@ jobs:
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
         run: |
-          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 <<EOF
-          DO $$
-          BEGIN
-            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
-              CREATE ROLE anon;
-            END IF;
-
-            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
-              CREATE ROLE authenticated;
-            END IF;
-          END
-          $$;
-          EOF
+          psql "$NEON_DATABASE_URL" -c "CREATE ROLE anon;" || true
+          psql "$NEON_DATABASE_URL" -c "CREATE ROLE authenticated;" || true
 
       - name: Restore backup to Neon
         env:
