@@ -95,4 +95,4 @@ jobs:
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
         run: |
-          psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 < backup.sql
+          psql "$NEON_DATABASE_URL" --set ON_ERROR_STOP=off < backup.sql
